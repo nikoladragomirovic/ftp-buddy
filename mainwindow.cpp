@@ -18,28 +18,11 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::on_button_upload_clicked()
-{
+void MainWindow::ftp_login(QTcpSocket &socket, QTcpSocket &dataSocket){
     ui->progress->setValue(0);
     ui->server_response->clear();
     QCoreApplication::processEvents();
 
-    QString filePath = QFileDialog::getOpenFileName(this, "Select File to Upload", QCoreApplication::applicationDirPath());
-
-    if (filePath.isEmpty()) {
-        ui->server_response->append("No file selected.");
-        return;
-    }
-
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly)) {
-        ui->server_response->append("Error opening file: " + file.errorString());
-        return;
-    }
-
-    QFileInfo fileInfo(file);
-
-    QTcpSocket socket;
     ui->progress->setValue(10);
 
     QString server_address = ui->server_address->text();
@@ -80,10 +63,37 @@ void MainWindow::on_button_upload_clicked()
         QString ipAddress = match.captured(1) + "." + match.captured(2) + "." + match.captured(3) + "." + match.captured(4);
         int port = match.captured(5).toInt() * 256 + match.captured(6).toInt();
 
-        QTcpSocket dataSocket;
-
         dataSocket.connectToHost(ipAddress, port);
         ui->progress->setValue(50);
+
+    }else {
+        ui->server_response->append("Failed to connect to the FTP server:" + socket.errorString());
+    }
+}
+
+void MainWindow::on_button_upload_clicked()
+{
+
+    QString filePath = QFileDialog::getOpenFileName(this, "Select File to Upload", QCoreApplication::applicationDirPath());
+
+    if (filePath.isEmpty()) {
+        ui->server_response->append("No file selected.");
+        return;
+    }
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        ui->server_response->append("Error opening file: " + file.errorString());
+        return;
+    }
+
+    QFileInfo fileInfo(file);
+
+
+    QTcpSocket socket;
+    QTcpSocket dataSocket;
+
+    ftp_login(socket, dataSocket);
 
         sendFtpCommand(socket, "STOR " + fileInfo.fileName());
 
@@ -115,10 +125,7 @@ void MainWindow::on_button_upload_clicked()
             }
         }
 
-    } else {
-        ui->server_response->append("Failed to connect to the FTP server:" + socket.errorString());
     }
-}
 
 void MainWindow::on_button_download_clicked()
 {
@@ -137,50 +144,9 @@ void MainWindow::on_button_download_clicked()
 
     ui->progress->setValue(10);
     QTcpSocket socket;
+    QTcpSocket dataSocket;
 
-    QString server_address = ui->server_address->text();
-    int server_port = ui->server_port->text().toInt();
-    QString username = ui->username->text();
-    QString password = ui->password->text();
-
-    socket.connectToHost(server_address, server_port);
-
-    if (socket.waitForConnected()) {
-        if (!waitForFtpResponse(socket)) {
-            ui->server_response->append("Failed to receive welcome message.");
-            return;
-        }
-        ui->progress->setValue(20);
-        sendFtpCommand(socket, "USER " + username);
-        sendFtpCommand(socket, "PASS " + password);
-
-        if (!waitForFtpResponse(socket)) {
-            ui->server_response->append("Login failed.");
-            return;
-        }
-        ui->progress->setValue(30);
-
-        sendFtpCommand(socket, "PASV");
-
-        QRegularExpressionMatch match;
-
-        if (socket.waitForReadyRead()) {
-            QString response = socket.readAll().trimmed();
-            QRegularExpression regex("\\((\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)\\)");
-            match = regex.match(response);
-        } else {
-            ui->server_response->append("Error waiting for FTP response:" + socket.errorString());
-        }
-
-        QString ipAddress = match.captured(1) + "." + match.captured(2) + "." + match.captured(3) + "." + match.captured(4);
-        int port = match.captured(5).toInt() * 256 + match.captured(6).toInt();
-
-
-        QTcpSocket dataSocket;
-
-        dataSocket.connectToHost(ipAddress, port);
-
-        ui->progress->setValue(50);
+    ftp_login(socket, dataSocket);
 
         sendFtpCommand(socket, "RETR " + selectedFileName);
 
@@ -213,10 +179,7 @@ void MainWindow::on_button_download_clicked()
         args << "-R" << filePath;
         QProcess::startDetached("open", args);
 
-    } else {
-        ui->server_response->append("Failed to connect to the FTP server:" + socket.errorString());
     }
-}
 
 void MainWindow::on_button_list_clicked()
 {
@@ -224,48 +187,11 @@ void MainWindow::on_button_list_clicked()
     QCoreApplication::processEvents();
     ui->progress->setValue(10);
     QTcpSocket socket;
+    QTcpSocket dataSocket;
 
-    QString server_address = ui->server_address->text();
-    int server_port = ui->server_port->text().toInt();
-    QString username = ui->username->text();
-    QString password = ui->password->text();
+    ftp_login(socket, dataSocket);
 
-    socket.connectToHost(server_address, server_port);
-
-    if (socket.waitForConnected()) {
-        if (!waitForFtpResponse(socket)) {
-            ui->server_response->append("Failed to receive welcome message.");
-            return;
-        }
-            ui->progress->setValue(20);
-        sendFtpCommand(socket, "USER " + username);
-        sendFtpCommand(socket, "PASS " + password);
-
-        if (!waitForFtpResponse(socket)) {
-            ui->server_response->append("Login failed.");
-            return;
-        }
-            ui->progress->setValue(50);
-        sendFtpCommand(socket, "PASV");
-
-        QRegularExpressionMatch match;
-
-        if (socket.waitForReadyRead()) {
-            QString response = socket.readAll().trimmed();
-            QRegularExpression regex("\\((\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)\\)");
-            match = regex.match(response);
-        } else {
-            ui->server_response->append("Error waiting for FTP response:" + socket.errorString());
-        }
-
-        QString ipAddress = match.captured(1) + "." + match.captured(2) + "." + match.captured(3) + "." + match.captured(4);
-        int port = match.captured(5).toInt() * 256 + match.captured(6).toInt();
-
-        QTcpSocket dataSocket;
-
-        dataSocket.connectToHost(ipAddress, port);
-
-                    ui->progress->setValue(70);
+    ui->progress->setValue(70);
 
         sendFtpCommand(socket, "NLST");
 
@@ -294,10 +220,7 @@ void MainWindow::on_button_list_clicked()
         socket.disconnectFromHost();
         dataSocket.disconnectFromHost();
 
-    } else {
-        ui->server_response->append("Failed to connect to the FTP server:" + socket.errorString());
     }
-}
 
 
 bool MainWindow::waitForFtpResponse(QTcpSocket &socket)
