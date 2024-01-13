@@ -21,7 +21,11 @@ MainWindow::~MainWindow()
 }
 
 // Every action needs a 'login' first, so its a separate function to be re-used
-void MainWindow::ftp_login(QTcpSocket &socket, QTcpSocket &dataSocket){
+bool MainWindow::ftp_login(){
+
+    //Disconnect sockets first
+    socket.disconnectFromHost();
+    dataSocket.disconnectFromHost();
 
     //Reset progress bar
     ui->progress->setValue(0);
@@ -45,13 +49,13 @@ void MainWindow::ftp_login(QTcpSocket &socket, QTcpSocket &dataSocket){
     //Check if connection established
     if(!socket.waitForConnected()){
         ui->server_response->append("Failed to connect to the FTP server:" + socket.errorString());
-        return;
+        return false;
     }
 
     //Wait for a welcome message upon connection
     if (!waitForFtpResponse(socket)) {
         ui->server_response->append("Failed to receive welcome message.");
-        return;
+        return false;
     }
 
     ui->progress->setValue(20);
@@ -61,7 +65,7 @@ void MainWindow::ftp_login(QTcpSocket &socket, QTcpSocket &dataSocket){
     //Wait for password prompt from server
     if (!waitForFtpResponse(socket)) {
         ui->server_response->append("Login failed.");
-        return;
+        return false;
     }
 
     ui->progress->setValue(30);
@@ -71,7 +75,7 @@ void MainWindow::ftp_login(QTcpSocket &socket, QTcpSocket &dataSocket){
     //Wait for login auth response from server
     if (!waitForFtpResponse(socket)) {
         ui->server_response->append("Login failed.");
-        return;
+        return false;
     }
 
     ui->progress->setValue(40);
@@ -88,7 +92,7 @@ void MainWindow::ftp_login(QTcpSocket &socket, QTcpSocket &dataSocket){
         match = regex.match(response);
     } else {
         ui->server_response->append("Error waiting for FTP response: " + socket.errorString());
-        return;
+        return false;
     }
 
     QString ip_address = match.captured(1) + "." + match.captured(2) + "." + match.captured(3) + "." + match.captured(4);
@@ -101,7 +105,11 @@ void MainWindow::ftp_login(QTcpSocket &socket, QTcpSocket &dataSocket){
     if(dataSocket.waitForConnected()){
         ui->server_response->append("Data socket connected");
         ui->progress->setValue(60);
+    }else{
+        return false;
     }
+
+    return true;
 }
 
 // Upload a file to the FTP server
@@ -127,12 +135,8 @@ void MainWindow::on_button_upload_clicked()
     //Used to get file name
     QFileInfo fileInfo(file);
 
-    //Declare default & data sockets
-    QTcpSocket socket;
-    QTcpSocket dataSocket;
-
-    //Use sockets to login to FTP server
-    ftp_login(socket, dataSocket);
+    //Log in to server
+    if (!ftp_login()) return;
 
     //Command to store file to FTP server
     sendFtpCommand(socket, "STOR " + fileInfo.fileName());
@@ -195,12 +199,8 @@ void MainWindow::on_button_download_clicked()
     //Put it in downloads folder
     QString filePath = "/Users/nile/Downloads/" + selectedFileName ;
 
-    //Declare default & data sockets
-    QTcpSocket socket;
-    QTcpSocket dataSocket;
-
-    //Use sockets to login to FTP server
-    ftp_login(socket, dataSocket);
+    //Log in to server
+    if (!ftp_login()) return;
 
     //Send command to download file
     sendFtpCommand(socket, "RETR " + selectedFileName);
@@ -230,9 +230,6 @@ void MainWindow::on_button_download_clicked()
 
     file.close();
 
-    socket.disconnectFromHost();
-    dataSocket.disconnectFromHost();
-
     ui->progress->setValue(100);
     ui->server_response->append("Download successful");
 
@@ -247,12 +244,8 @@ void MainWindow::on_button_download_clicked()
 void MainWindow::on_button_list_clicked()
 {
 
-    //Declare default & data sockets
-    QTcpSocket socket;
-    QTcpSocket dataSocket;
-
-    //Use sockets to login to FTP server
-    ftp_login(socket, dataSocket);
+    //Log in to server
+    if (!ftp_login()) return;
 
     ui->progress->setValue(70);
 
@@ -265,34 +258,27 @@ void MainWindow::on_button_list_clicked()
         return;
     }
 
-    //Read list from dataSocket
-    if (dataSocket.waitForReadyRead()) {
+    ui->progress->setValue(80);
 
-        //Parse string of files as QStringList
-        QByteArray fileData = dataSocket.readAll();
-        QStringList fileList = QString(fileData).split("\r\n", Qt::SkipEmptyParts);
+    dataSocket.waitForReadyRead();
 
-        //Clear file list
-        ui->file_list->clear();
+    //Parse string of files as QStringList
+    QByteArray fileData = dataSocket.readAll();
+    QStringList fileList = QString(fileData).split("\r\n", Qt::SkipEmptyParts);
 
-        //Update file list
-        foreach (const QString &item, fileList) {
-            ui->file_list->addItem(item);
-        }
+    //Clear file list
+    ui->file_list->clear();
 
-        //Update progress
-        ui->progress->setValue(100);
-        ui->server_response->append("File listing completed successfully.");
-
-    } else {
-        ui->server_response->append("Error waiting for FTP response:" + dataSocket.errorString());
+    //Update file list
+    foreach (const QString &item, fileList) {
+        ui->file_list->addItem(item);
     }
 
-    socket.disconnectFromHost();
-    dataSocket.disconnectFromHost();
+    //Update progress
+    ui->progress->setValue(100);
+    ui->server_response->append("File listing completed successfully.");
 
-    }
-
+}
 
     //Wrapper function based on waitForReadyRead()
 bool MainWindow::waitForFtpResponse(QTcpSocket &socket)

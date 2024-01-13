@@ -35,13 +35,15 @@ public slots:
 private slots:
     void on_button_upload_clicked();
     void on_button_download_clicked();
-    void ftp_login(QTcpSocket &socket, QTcpSocket &dataSocket);
+    bool ftp_login();
     bool waitForFtpResponse(QTcpSocket &socket);
     void sendFtpCommand(QTcpSocket &socket, const QString &command);
 
 private:
     Ui::MainWindow *ui;
     QStringListModel *fileListModel;
+    QTcpSocket socket;
+    QTcpSocket dataSocket;
 };
 
 #endif // MAINWINDOW_H
