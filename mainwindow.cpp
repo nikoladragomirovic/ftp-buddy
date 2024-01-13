@@ -273,6 +273,39 @@ void MainWindow::on_button_list_clicked()
 
 }
 
+void MainWindow::on_button_remove_clicked()
+{
+    // Log in to the server
+    if (!ftp_login()) return;
+
+    // Get selected file name
+    QListWidgetItem *selectedItem = ui->file_list->currentItem();
+
+    // If no item is selected, do nothing
+    if (!selectedItem) {
+        ui->server_response->append("No file selected for removal.");
+        return;
+    }
+
+    QString selectedFileName = selectedItem->text();
+
+    // Send command to remove file
+    sendFtpCommand(socket, "DELE " + selectedFileName);
+
+    // Wait for FTP response
+    if (!waitForFtpResponse(socket)) {
+        ui->server_response->append("Failed to initiate file removal.");
+        return;
+    } else {
+        ui->progress->setValue(80);
+    }
+
+    ui->server_response->append("File removal successful.");
+
+    // Refresh the file list after removal
+    on_button_list_clicked();
+}
+
     //Wrapper function based on waitForReadyRead()
 bool MainWindow::waitForFtpResponse(QTcpSocket &socket)
 {
@@ -299,5 +332,5 @@ void MainWindow::sendFtpCommand(QTcpSocket &socket, const QString &command)
     socket.waitForBytesWritten();
 
     //To give server time to respond (can be higher or lower based on server speed)
-    QThread::msleep(1000);
+    QThread::msleep(100);
 }
