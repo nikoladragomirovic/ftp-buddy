@@ -41,7 +41,6 @@ private slots:
 
 private:
     Ui::MainWindow *ui;
-    QTcpSocket *dataSocket;
     QStringListModel *fileListModel;
 };
 
