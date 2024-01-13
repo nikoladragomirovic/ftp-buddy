@@ -155,17 +155,7 @@ void MainWindow::on_button_upload_clicked()
     //Write to dataSocket instead of default socket
     dataSocket.write(fileData);
 
-    //If bytes written successfully update progress & disconnect both sockets
-    if (dataSocket.waitForBytesWritten()){
-        socket.disconnectFromHost();
-        dataSocket.disconnectFromHost();
-         ui->server_response->append("Download completed successfully.");
-        ui->progress->setValue(100);
-
-    }else{
-        ui->server_response->append("Couldn't upload file");
-        return;
-    }
+    while(dataSocket.waitForBytesWritten());
 
     //Update file list after upload finishes
     on_button_list_clicked();
@@ -179,6 +169,9 @@ void MainWindow::on_button_upload_clicked()
             break;
         }
     }
+
+    ui->server_response->append("Upload completed successfully!");
+    ui->progress->setValue(100);
 
     }
 
