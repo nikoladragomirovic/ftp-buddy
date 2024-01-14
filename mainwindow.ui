@@ -82,7 +82,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>Server Response</string>
+     <string>Server</string>
     </property>
    </widget>
    <widget class="QLabel" name="label_2">
@@ -95,7 +95,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>File List</string>
+     <string>Files</string>
     </property>
    </widget>
    <widget class="QListWidget" name="file_list">
@@ -203,19 +203,6 @@
      <string>Port</string>
     </property>
    </widget>
-   <widget class="QProgressBar" name="progress">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>410</y>
-      <width>681</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="value">
-     <number>24</number>
-    </property>
-   </widget>
    <widget class="QPushButton" name="button_remove">
     <property name="geometry">
      <rect>
@@ -227,6 +214,19 @@
     </property>
     <property name="text">
      <string>Remove File</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="button_login">
+    <property name="geometry">
+     <rect>
+      <x>180</x>
+      <y>40</y>
+      <width>100</width>
+      <height>32</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Log in</string>
     </property>
    </widget>
   </widget>

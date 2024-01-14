@@ -29,14 +29,13 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
-public slots:
-    void on_button_list_clicked();
-
 private slots:
     void on_button_upload_clicked();
     void on_button_download_clicked();
     void on_button_remove_clicked();
-    bool ftp_login();
+    void on_button_list_clicked();
+    void on_button_login_clicked();
+    bool pasv_response();
     bool waitForFtpResponse(QTcpSocket &socket);
     void sendFtpCommand(QTcpSocket &socket, const QString &command);
 

@@ -12,7 +12,6 @@ MainWindow::MainWindow(QWidget *parent)
     ui->server_port->setText("21");
     ui->username->setText("dlpuser");
     ui->password->setText("rNrKYTX9g7z3RgJRmxWuGHbeu");
-    ui->progress->setValue(0);
 }
 
 MainWindow::~MainWindow()
@@ -21,22 +20,17 @@ MainWindow::~MainWindow()
 }
 
 // Every action needs a 'login' first, so its a separate function to be re-used
-bool MainWindow::ftp_login(){
+void MainWindow::on_button_login_clicked(){
 
     //Disconnect sockets first
     socket.disconnectFromHost();
     dataSocket.disconnectFromHost();
-
-    //Reset progress bar
-    ui->progress->setValue(0);
 
     //Clear server response text field
     ui->server_response->clear();
 
     //Process events to update UI instantly
     QCoreApplication::processEvents();
-
-    ui->progress->setValue(10);
 
     //Get variables from input fields
     QString server_address = ui->server_address->text();
@@ -49,67 +43,31 @@ bool MainWindow::ftp_login(){
     //Check if connection established
     if(!socket.waitForConnected()){
         ui->server_response->append("Failed to connect to the FTP server:" + socket.errorString());
-        return false;
+        return;
     }
 
     //Wait for a welcome message upon connection
     if (!waitForFtpResponse(socket)) {
         ui->server_response->append("Failed to receive welcome message.");
-        return false;
+        return;
     }
-
-    ui->progress->setValue(20);
 
     sendFtpCommand(socket, "USER " + username);
 
     //Wait for password prompt from server
     if (!waitForFtpResponse(socket)) {
         ui->server_response->append("Login failed.");
-        return false;
+        return;
     }
-
-    ui->progress->setValue(30);
 
     sendFtpCommand(socket, "PASS " + password);
 
     //Wait for login auth response from server
     if (!waitForFtpResponse(socket)) {
         ui->server_response->append("Login failed.");
-        return false;
+        return;
     }
 
-    ui->progress->setValue(40);
-
-    //Send passive mode command
-    sendFtpCommand(socket, "PASV");
-
-    QRegularExpressionMatch match;
-
-    //Parse server response (IP & PORT for data connection)
-    if (socket.waitForReadyRead()) {
-        QString response = socket.readAll().trimmed();
-        QRegularExpression regex("\\((\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)\\)");
-        match = regex.match(response);
-    } else {
-        ui->server_response->append("Error waiting for FTP response: " + socket.errorString());
-        return false;
-    }
-
-    QString ip_address = match.captured(1) + "." + match.captured(2) + "." + match.captured(3) + "." + match.captured(4);
-    int port = match.captured(5).toInt() * 256 + match.captured(6).toInt();
-
-    //Connect separate data socket to specified IP & PORT in PASV
-    dataSocket.connectToHost(ip_address, port);
-
-    //Update progress if dataSocket connected
-    if(dataSocket.waitForConnected()){
-        ui->server_response->append("Data socket connected");
-        ui->progress->setValue(60);
-    }else{
-        return false;
-    }
-
-    return true;
 }
 
 // Upload a file to the FTP server
@@ -136,7 +94,7 @@ void MainWindow::on_button_upload_clicked()
     QFileInfo fileInfo(file);
 
     //Log in to server
-    if (!ftp_login()) return;
+    if (!pasv_response()) return;
 
     //Command to store file to FTP server
     sendFtpCommand(socket, "STOR " + fileInfo.fileName());
@@ -145,8 +103,6 @@ void MainWindow::on_button_upload_clicked()
     if (!waitForFtpResponse(socket)) {
         ui->server_response->append("Failed to initiate upload.");
         return;
-    }else{
-        ui->progress->setValue(80);
     }
 
     //Read file as bytes
@@ -170,10 +126,7 @@ void MainWindow::on_button_upload_clicked()
         }
     }
 
-    ui->server_response->append("Upload completed successfully!");
-    ui->progress->setValue(100);
-
-    }
+ }
 
     //Download a file from FTP server
 void MainWindow::on_button_download_clicked()
@@ -193,7 +146,7 @@ void MainWindow::on_button_download_clicked()
     QString filePath = "/Users/nile/Downloads/" + selectedFileName ;
 
     //Log in to server
-    if (!ftp_login()) return;
+    if (!pasv_response()) return;
 
     //Send command to download file
     sendFtpCommand(socket, "RETR " + selectedFileName);
@@ -202,8 +155,6 @@ void MainWindow::on_button_download_clicked()
     if (!waitForFtpResponse(socket)) {
         ui->server_response->append("Failed to initiate download.");
         return;
-    }else{
-        ui->progress->setValue(80);
     }
 
     QFile file(filePath);
@@ -223,9 +174,6 @@ void MainWindow::on_button_download_clicked()
 
     file.close();
 
-    ui->progress->setValue(100);
-    ui->server_response->append("Download successful");
-
     //Highlight file in default viewer
     QStringList args;
     args << "-R" << filePath;
@@ -236,11 +184,8 @@ void MainWindow::on_button_download_clicked()
     //List files in FTP server
 void MainWindow::on_button_list_clicked()
 {
-
     //Log in to server
-    if (!ftp_login()) return;
-
-    ui->progress->setValue(70);
+    if (!pasv_response()) return;
 
     //Send list command to FTP server
     sendFtpCommand(socket, "NLST");
@@ -250,8 +195,6 @@ void MainWindow::on_button_list_clicked()
         ui->server_response->append("Failed to initiate file listing.");
         return;
     }
-
-    ui->progress->setValue(80);
 
     dataSocket.waitForReadyRead();
 
@@ -266,17 +209,12 @@ void MainWindow::on_button_list_clicked()
     foreach (const QString &item, fileList) {
         ui->file_list->addItem(item);
     }
-
-    //Update progress
-    ui->progress->setValue(100);
-    ui->server_response->append("File listing completed successfully.");
-
 }
 
 void MainWindow::on_button_remove_clicked()
 {
     // Log in to the server
-    if (!ftp_login()) return;
+    if (!pasv_response()) return;
 
     // Get selected file name
     QListWidgetItem *selectedItem = ui->file_list->currentItem();
@@ -296,14 +234,45 @@ void MainWindow::on_button_remove_clicked()
     if (!waitForFtpResponse(socket)) {
         ui->server_response->append("Failed to initiate file removal.");
         return;
-    } else {
-        ui->progress->setValue(80);
     }
-
-    ui->server_response->append("File removal successful.");
 
     // Refresh the file list after removal
     on_button_list_clicked();
+}
+
+bool MainWindow::pasv_response(){
+
+    //Disconnect data socket first
+    dataSocket.disconnectFromHost();
+
+    //Send passive mode command
+    sendFtpCommand(socket, "PASV");
+
+    QRegularExpressionMatch match;
+
+    //Parse server response (IP & PORT for data connection)
+    if (socket.waitForReadyRead()) {
+        QString response = socket.readAll().trimmed();
+        QRegularExpression regex("\\((\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)\\)");
+        match = regex.match(response);
+    } else {
+        ui->server_response->append("Error waiting for FTP response: " + socket.errorString());
+        return false;
+    }
+
+    QString ip_address = match.captured(1) + "." + match.captured(2) + "." + match.captured(3) + "." + match.captured(4);
+    int port = match.captured(5).toInt() * 256 + match.captured(6).toInt();
+
+    //Connect separate data socket to specified IP & PORT in PASV
+    dataSocket.connectToHost(ip_address, port);
+
+    //Update progress if dataSocket connected
+    if(!dataSocket.waitForConnected()){
+        ui->server_response->append("PASV response error");
+        return false;
+    }
+
+    return true;
 }
 
     //Wrapper function based on waitForReadyRead()
