@@ -299,7 +299,4 @@ void MainWindow::sendFtpCommand(QTcpSocket &socket, const QString &command)
     //Writes command to socket (socket connected to FTP server)
     socket.write(commandData);
     socket.waitForBytesWritten();
-
-    //To give server time to respond (can be higher or lower based on server speed)
-    QThread::msleep(100);
 }

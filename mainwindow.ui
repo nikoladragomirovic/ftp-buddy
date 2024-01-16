@@ -14,7 +14,7 @@
    <enum>Qt::NoFocus</enum>
   </property>
   <property name="windowTitle">
-   <string>FTP Client</string>
+   <string>FTP Buddy</string>
   </property>
   <property name="autoFillBackground">
    <bool>false</bool>
